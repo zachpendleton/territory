@@ -90,6 +90,52 @@ in the `X-Turn-Token` header in the subsequent call to the `moves` endpoint.
 
 Play a tile in an in-progress game.
 
+#### Request
+
+NOTE: Requests _must_ include the `X-Turn-Token` header from the previous turn.
+
+```json
+{
+  "row": 3,
+  "col": 1
+}
+```
+
+To skip the current team, the player may send a body of "PASS" to the server.
+
+#### Response
+
+```json
+{
+  "players": [
+    {
+      "name": "Peggy Olson",
+      "score": 2,
+      "id": "c65f9efc",
+      "hand": [
+        {"row": 4, "col": 0},
+        {"row": 0, "col": 0},
+        ...
+      ],
+    },
+    {
+      "name": "Don Draper",
+      "score": 1,
+      "id": "890a9f3b",
+      "hand": 6
+    }
+  ],
+  "state": "in play",
+  "draw_size": 10,
+  "claims": [
+    {
+      "tile": {"row": 3, "col": 1},
+      "owner": "c65f9efc"
+    }
+  ]
+}
+```
+
 ## License
 
 Copyright © 2015 Zach Pendleton
