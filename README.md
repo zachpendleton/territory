@@ -8,9 +8,36 @@ A game server. Fun!
 
 Fetch the status of a previously created game.
 
+#### Response
+
+```json
+{
+  "players":[],
+  "state": "initiating",
+  "rows": 6,
+  "cols": 6,
+  "draw_size": 36,
+  "claims": [],
+  "player_id": null
+}
+```
+
 ### POST /api/games
 
 Create a new Game object.
+
+#### Request
+
+```json
+{
+  "rows": 6,
+  "cols": 6
+}
+```
+
+#### Response
+
+An empty 201 with a game URL in the `Location` header.
 
 ### POST /api/games/{id}/players
 
