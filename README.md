@@ -70,7 +70,7 @@ Create a new player inside a game.
     {
       "name": "Peggy Olson",
       "score": 0,
-      "id" a1d6f35a",
+      "id": "a1d6f35a",
       "hand": 6
     }
   ],
