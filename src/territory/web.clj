@@ -12,9 +12,8 @@
   (:import [java.util UUID]))
 
 (defn create-game
-  [db]
-  (let [id (str (UUID/randomUUID))
-        new-game {:state :created :players []}]
+  [db id]
+  (let [new-game {:state :created :players []}]
     (database/save db id new-game)
     (generate-string {:game (assoc new-game :id id)})))
 
@@ -25,7 +24,7 @@
 (defn app-routes
   [database]
   (routes (GET "/health-check" [] (health-check))
-          (POST "/games" [] (create-game database))
+          (POST "/games" [] (create-game database (str (UUID/randomUUID))))
           (not-found (generate-string {:status "Not Found"}))))
 
 (defrecord WebServer [port handle]
