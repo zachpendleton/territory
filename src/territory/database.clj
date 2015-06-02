@@ -22,7 +22,7 @@
         (assoc this :store nil))
       this))
   (fetch [this k]
-    (get (:store this) k))
+    (get @(:store this) k))
   (save [this k v]
     (swap! (:store this) assoc k v)))
 
