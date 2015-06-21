@@ -1,4 +1,5 @@
-(ns territory.game)
+(ns territory.game
+  (:require [clojure.set :refer [union]]))
 
 ; Example
 ;
@@ -95,3 +96,75 @@
            :played-tiles (conj played-tiles tile)
            :claims (assoc claims location army)
            :armies (conj remaining-armies (assoc army :tiles (clojure.set/union (:tiles army) (:tiles largest-army)))))))
+
+(defn absorb
+  "Returns army a with both its original and army b's cells."
+  [a b]
+  (assoc a :cells (union (:cells a) (:cells b))))
+
+(defn neighboring-armies
+  "Given a field map, an armies map, and a location, returns armies located
+  adjacent to the location: up, down, left, and right."
+  [field armies [x y]]
+  (let [neighbors [[     x (inc y)]
+                   [(inc x)     y]
+                   [     x (dec y)]
+                   [(dec x)     y]]]
+    (into #{} (->> neighbors
+                   (map #(get field %))
+                   (map #(get armies %))
+                   (remove nil?)))))
+
+(defn largest-armies
+  "Given a sequence of armies, returns the army or armies occupying the most
+  cells."
+  [armies]
+  (let [armies-by-size (group-by #(count (:cells %)) armies)
+        largest-size (-> armies-by-size keys sort last)]
+    (get armies-by-size largest-size)))
+
+(defn pick-winner
+  "Determine the winner among the armies, that with the most cells. A tie is
+  broken by indicating a favor. If there is a tie and the favor is not among
+  the potential winners, returns nil."
+  [armies favor]
+  (let [largest (largest-armies armies)
+        pred (if (= (count largest) 1)
+               identity
+               #(and (= favor (:player %)) %))]
+    (some pred largest)))
+
+(defn battle
+  "Pit the armies against each other, returning the winner after absorbing the
+  losers' cells."
+  [armies favor]
+  (let [winner (pick-winner armies favor)
+        losers (remove #{winner} armies)]
+    (reduce absorb winner losers)))
+
+(defn claim-cells
+  "Set all values in the field map corresponding to the army's cells to the
+  army's :id."
+  [field army]
+  (reduce #(assoc %1 %2 (:id army)) field (:cells army)))
+
+(defn cull-losers
+  "Remove losers from an armies map."
+  [armies combatants winner]
+  (-> (apply dissoc armies (map :id combatants))
+      (assoc (:id winner) winner)))
+
+(defn deploy-army
+  "Deploys the given army into the field, battling any neighbors for control. A
+  new game with updated field and armies maps is returned."
+  [{:keys [field armies] :as game} army favor]
+  (let [neighbors (reduce #(union %1 (neighboring-armies field armies %2))
+                          #{}
+                          (:cells army))
+        combatants (conj neighbors army)
+        winner (battle combatants favor)
+        new-field (claim-cells field winner)
+        new-armies (cull-losers armies combatants winner)]
+    (assoc game
+           :field  new-field
+           :armies new-armies)))

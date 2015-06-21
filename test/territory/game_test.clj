@@ -82,3 +82,80 @@
         "playing a tile in an unoccupied region of the board creates another army")
     (is (= 1 (:claims (-> game (game/play-tile tile) (game/play-tile {:row 0, :col 1}))))
         "playing a tile next to an occupied space joins it into one army")))
+
+(deftest absorb-test
+  (testing "first army absorbs second army's cells"
+    (is (= {:player 1 :cells #{1 2 3}}
+           (absorb {:player 1 :cells #{1 3}}
+                   {:player 2 :cells #{2}})))))
+
+(deftest neighboring-armies-test
+  (testing "retrieving neighbors from an empty board returns an empty set"
+    (is (= #{}
+           (neighboring-armies {} {} [1 1]))))
+  (testing "retrieving neighbors only returns unique armies"
+    (is (= #{:an-army :another-army}
+           (neighboring-armies {[1 2] 1
+                                [2 1] 2
+                                [1 0] 2
+                                [0 1] 1}
+                               {1 :an-army 2 :another-army}
+                               [1 1])))))
+
+(deftest largest-armies-test
+  (testing "get largest armies"
+    (is (= [{:cells [1 2 3]} {:cells [4 5 6]}]
+           (largest-armies [{:cells [1 2 3]}
+                            {:cells [1 2]}
+                            {:cells [1]}
+                            {:cells [4 5 6]}])))))
+
+(deftest pick-winning-army-test
+  (testing "returns a single winning army regardless of favor"
+    (is (= {:player 1 :cells [1 2 3]}
+           (pick-winning-army [{:player 1 :cells [1 2 3]}
+                               {:player 2 :cells [1]}]
+                              2))))
+  (testing "returns an army matching the favor if there are two tied"
+    (is (= {:player 2 :cells [4 5 6]}
+           (pick-winning-army [{:player 1 :cells [1 2 3]}
+                               {:player 2 :cells [4 5 6]}]
+                              2))))
+  (testing "returns nil if no disputed winner matches favor"
+    (is (= nil
+           (pick-winning-army [{:player 1 :cells [1 2 3]}
+                               {:player 2 :cells [4 5 6]}]
+                              3)))))
+
+(deftest deploy-army-test
+  (testing "playing a tile into an empty field"
+    (let [field {}
+          armies {}
+          game {:field field :armies armies}
+          army {:id "a-1" :player "p-1" :cells #{[1 1]}}
+          new-game (deploy-army game army "p-1")]
+      (is (= {[1 1] "a-1"}
+             (:field new-game)))
+      (is (= {"a-1" {:id "a-1" :player "p-1" :cells #{[1 1]}}}
+             (:armies new-game)))))
+  (testing "playing a tile into a non-empty field"
+    (let [field {[1 1] "a-1"}
+          armies {"a-1" {:id "a-1" :player "p-1" :cells #{[1 1]}}}
+          game {:field field :armies armies}
+          army {:id "a-2" :player "p-2" :cells #{[3 1]}}
+          new-game (deploy-army game army "p-2")]
+      (is (= {[1 1] "a-1", [3 1] "a-2"}
+             (:field new-game)))
+      (is (= {"a-1" {:id "a-1" :player "p-1" :cells #{[1 1]}}
+              "a-2" {:id "a-2" :player "p-2" :cells #{[3 1]}}}
+             (:armies new-game)))))
+  (testing "playing a tile next to an existing size-one army"
+    (let [field {[1 1] "a-1"}
+          armies {"a-1" {:id "a-1" :player "p-1" :cells #{[1 1]}}}
+          game {:field field :armies armies}
+          army {:id "a-2" :player "p-2" :cells #{[2 1]}}
+          new-game (deploy-army game army "p-2")]
+      (is (= {[1 1] "a-2", [2 1] "a-2"}
+             (:field new-game)))
+      (is (= {"a-2" {:id "a-2" :player "p-2" :cells #{[1 1] [2 1]}}}
+             (:armies new-game))))))
