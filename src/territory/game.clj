@@ -3,13 +3,12 @@
 ; Example
 ;
 ; {:id "game-1"
-;  :players #{{:id "player-1"
+;  :players [{:id "player-1"
 ;              :name "Don Draper"
 ;              :hand #{{:row 2, :col 2}}}
 ;             {:id "player-2"
 ;              :name "Peggy Olsen"
-;              :hand #{{:row 2, :col 4}}}}
-;  :turns (cycle players)
+;              :hand #{{:row 2, :col 4}}}]
 ;  :board {:width 6 :height 6}
 ;  :armies #{
 ;    {:player "player-1"
@@ -22,6 +21,7 @@
 ;    [1 1] <army 1>
 ;    [3 3] <army 2>
 ;  }
+;  :played-tiles []
 ;  :draw '({:row 3, :col 5} ...)
 
 (defn make-draw [{:keys [width height]}]
@@ -31,44 +31,67 @@
 
 (defn new-game [id num-players board]
   {:id id
-   :players (with-meta #{} {:awaiting num-players})
+   :players (with-meta [] {:awaiting num-players})
    :board board
-   :turns nil
-   :armies #{}
+   :played-tiles []
    :claims {}
+   :armies #{}
    :draw (make-draw board)})
+
+(defn ^:dynamic handle-extra-player [game _]
+  game)
 
 (defn add-player [game player]
   (let [players (:players game)
         awaiting (:awaiting (meta players) 0)]
-    (when (pos? awaiting)
-      (let [new-players (conj players player)]
+    (if (pos? awaiting)
+      (let [new-players (distinct (conj players (atom player)))]
         (assoc game
                :players (with-meta new-players
                                    {:awaiting (-> awaiting
                                                   (- (count new-players))
-                                                  (+ (count players)))}))))))
+                                                  (+ (count players)))})))
+      (handle-extra-player game player))))
 
 (defn shuffle-draw [game]
   (assoc game :draw (shuffle (:draw game))))
 
-(def hand-size 6)
+(defn shuffle-players [game]
+  (let [players (:players game)]
+    (assoc game :players (with-meta (shuffle players) (meta players)))))
 
-(defn deal-hands [game]
-  (reduce (fn [game player]
-            (let [hand (take hand-size (:draw game))
-                  draw (drop hand-size (:draw game))]
-              (assoc game :players (conj (set (:players game))
-                                         (assoc player :hand hand))
-                     :draw draw)))
-          (dissoc game :players)
-          (:players game)))
+(defn ^:dynamic handle-not-enough-cards [game _]
+  game)
 
-(defn start-game [game]
+(defn deal-hands [{:keys [players draw] :as game} hand-size]
+  (if (<= (* (count players) hand-size) (count draw))
+    (reduce (fn [{:keys [players draw] :as game} player]
+              (let [hand (take hand-size draw)
+                    new-draw (drop hand-size draw)]
+                (assoc game
+                       :players (conj players (swap! player assoc :hand hand))
+                       :draw new-draw)))
+            (assoc game :players [])
+            players)
+    (handle-not-enough-cards game hand-size)))
+
+(defn start-game [game hand-size]
   (let [awaiting (:awaiting (meta (:players game)) 0)]
-    (if-not (pos? awaiting)
-      (let [game (deal-hands game)]
-        ; This cycle thing is cute, but makes a game hard to inspect in the
-        ; REPL, which is lame; will probably just leverage this on the fly with
-        ; some sort of turn counter.
-        (assoc game :turns (cycle (:players game)))))))
+    (when-not (pos? awaiting) (deal-hands game hand-size))))
+
+(defn current-player [{:keys [played-tiles players] :as game}]
+  (->> (cycle players)
+       (drop (count played-tiles))
+       first))
+
+(defn play-tile [{:keys [armies claims played-tiles] :as game} tile]
+  (let [location ((juxt :row :col) tile)
+        neighboring-armies (into #{} (map #(get claims %) [[0 -1] [1 0] [0 1] [-1 0]]))
+        largest-army (last (sort-by (comp count :tiles) neighboring-armies))
+        remaining-armies (remove #{largest-army} armies)
+        army {:player (:favor tile (current-player game))
+              :tiles #{location}}]
+    (assoc game
+           :played-tiles (conj played-tiles tile)
+           :claims (assoc claims location army)
+           :armies (conj remaining-armies (assoc army :tiles (clojure.set/union (:tiles army) (:tiles largest-army)))))))
