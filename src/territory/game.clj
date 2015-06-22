@@ -46,7 +46,7 @@
   (let [players (:players game)
         awaiting (:awaiting (meta players) 0)]
     (if (pos? awaiting)
-      (let [new-players (distinct (conj players (atom player)))]
+      (let [new-players (distinct (conj players player))]
         (assoc game
                :players (with-meta new-players
                                    {:awaiting (-> awaiting
@@ -84,18 +84,6 @@
   (->> (cycle players)
        (drop (count played-tiles))
        first))
-
-(defn play-tile [{:keys [armies claims played-tiles] :as game} tile]
-  (let [location ((juxt :row :col) tile)
-        neighboring-armies (into #{} (map #(get claims %) [[0 -1] [1 0] [0 1] [-1 0]]))
-        largest-army (last (sort-by (comp count :tiles) neighboring-armies))
-        remaining-armies (remove #{largest-army} armies)
-        army {:player (:favor tile (current-player game))
-              :tiles #{location}}]
-    (assoc game
-           :played-tiles (conj played-tiles tile)
-           :claims (assoc claims location army)
-           :armies (conj remaining-armies (assoc army :tiles (clojure.set/union (:tiles army) (:tiles largest-army)))))))
 
 (defn absorb
   "Returns army a with both its original and army b's cells."
